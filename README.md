@@ -1,1 +1,0 @@
-# compkiller-GUI
