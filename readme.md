@@ -28,12 +28,12 @@ Press **Left Alt** to open/close the UI (default keybind).
 ## 📥 Installation
 
 ```luau
-local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))()
+local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/Ziozindex/compkiller-GUI/refs/heads/main/Compkiller-Library-main/src.luau"))()
 ```
 ## 🚀 Quick Start Example
 
 ```luau
-local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))()
+local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/Ziozindex/compkiller-GUI/refs/heads/main/Compkiller-Library-main/src.luau"))()
 
 -- Notification System
 local Notifier = Compkiller.newNotify()
