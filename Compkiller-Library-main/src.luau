@@ -6,7 +6,7 @@
     Github: https://github.com/4lpaca-pin/CompKiller
     Original: compkiller.net
 
-        Version: 2.7
+        Version: 2.8
     - Improved Performance Mode
     	Compkiller:OptimizeMode(< boolean >)
   	- Added Auto Color Logo
@@ -356,7 +356,7 @@ local Mouse: Mouse = LocalPlayer:GetMouse();
 local CurrentCamera: Camera? = cloneref(workspace.CurrentCamera);
 
 local Compkiller = {
-	Version = '2.7',
+	Version = '2.8',
 	Logo = "rbxassetid://120245531583106",
 	Windows = {},
 	Scale = {
@@ -1933,6 +1933,30 @@ function Compkiller:_AddLinkValue(Name , Default , GlobalBlock , LinkValues , re
 		end;
 
 		local Input = Compkiller:_Input(Toggle);
+
+		local IsPressed = false;
+		Input.MouseButton1Down:Connect(function()
+			if IsPressed then return end
+			IsPressed = true
+
+			Compkiller:_Animation(ToggleValue,TweenInfo.new(0.08),{
+				Size = UDim2.new(0.48, 0, 0.48, 0)
+			})
+		end)
+
+		Input.MouseButton1Up:Connect(function()
+			if not IsPressed then return end
+			IsPressed = false
+
+			local over = Compkiller:_IsMouseOverFrame(Toggle)
+			local targetSize =
+				(over and not Default) and UDim2.new(0.6, 0, 0.6, 0)
+				or UDim2.new(0.550000012, 0, 0.550000012, 0)
+
+			Compkiller:_Animation(ToggleValue,rep.Tween,{
+				Size = targetSize
+			})
+		end)
 
 		Compkiller:_Hover(Input , function()
 			if not Default then
@@ -4774,12 +4798,13 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 		local Keybind = Block:AddLink('Keybind' , Config.Default);
 
 		local IsBinding = false;
+		local IsPressed = false;
 
 		local IsBlacklist = function(v)
 			return Config.Blacklist and (Config.Blacklist[v] or table.find(Config.Blacklist,v))
 		end;
 
-		Compkiller:_Input(Keybind.Root,function()
+		local KeybindInput = Compkiller:_Input(Keybind.Root,function()
 			if IsBinding then
 				return;
 			end;
@@ -4812,6 +4837,25 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 
 			Config.Callback(KeyName);
 		end);
+
+		KeybindInput.MouseButton1Down:Connect(function()
+			if IsPressed then return end
+			if not Signal:GetValue() then return end
+
+			IsPressed = true
+			Compkiller:_Animation(Keybind.Root,TweenInfo.new(0.08),{
+				BackgroundTransparency = 0.6
+			})
+		end)
+
+		KeybindInput.MouseButton1Up:Connect(function()
+			if not IsPressed then return end
+			IsPressed = false
+
+			Compkiller:_Animation(Keybind.Root,TweenInfo.new(0.12),{
+				BackgroundTransparency = (Signal:GetValue() and 0.8) or 1
+			})
+		end)
 
 		local Args = {};
 
@@ -5310,6 +5354,9 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 			SliderBar.InputBegan:Connect(function(Input)
 				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 					IsHold = true
+					Compkiller:_Animation(UIScale,TweenInfo.new(0.08),{
+						Scale = 1.08
+					})
 					Update(Input)
 				end
 			end)
@@ -5323,6 +5370,10 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 					else
 						IsHold = false
 					end;
+
+					Compkiller:_Animation(UIScale,TweenInfo.new(0.12),{
+						Scale = 1.300
+					})
 				end
 			end)
 
@@ -6516,6 +6567,75 @@ function Compkiller.new(Config : Window)
 	});
 
 	UICorner.Parent = MainFrame
+
+	-- Mobile: allow touch users to resize the window.
+	if Compkiller:_IsMobile() then
+		local ResizeHandle = Instance.new("Frame")
+		local ResizeCorner = Instance.new("UICorner")
+		local ResizeStroke = Instance.new("UIStroke")
+
+		ResizeHandle.Name = Compkiller:_RandomString()
+		ResizeHandle.Parent = MainFrame
+		ResizeHandle.AnchorPoint = Vector2.new(1, 1)
+		ResizeHandle.BackgroundTransparency = 1
+		ResizeHandle.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		ResizeHandle.BorderSizePixel = 0
+		ResizeHandle.Size = UDim2.new(0, 20, 0, 20)
+		ResizeHandle.Position = UDim2.new(1, -5, 1, -5)
+		ResizeHandle.ZIndex = 50
+		ResizeHandle.Active = true
+
+		ResizeCorner.CornerRadius = UDim.new(0, 4)
+		ResizeCorner.Parent = ResizeHandle
+
+		ResizeStroke.Thickness = 2
+		ResizeStroke.Color = Compkiller.Colors.LineColor
+		ResizeStroke.Parent = ResizeHandle
+
+		Compkiller:_AddDragBlacklist(ResizeHandle)
+
+		local IsResizing = false
+		local ResizeStartPos: Vector2? = nil
+		local ResizeStartSize: Vector2? = nil
+
+		ResizeHandle.InputBegan:Connect(function(input)
+			if IsResizing then return end
+			if not WindowArgs.IsOpen then return end
+
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				IsResizing = true
+				ResizeStartPos = input.Position
+				ResizeStartSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
+			end
+		end)
+
+		ResizeHandle.InputEnded:Connect(function(input)
+			if not IsResizing then return end
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				IsResizing = false
+				ResizeStartPos = nil
+				ResizeStartSize = nil
+			end
+		end)
+
+		UserInputService.InputChanged:Connect(function(input)
+			if not IsResizing then return end
+			if not (ResizeStartPos and ResizeStartSize) then return end
+
+			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+				local delta = input.Position - ResizeStartPos
+
+				local viewportSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1920, 1080)
+				local newWidth = math.clamp(ResizeStartSize.X + delta.X, 320, viewportSize.X - 50)
+				local newHeight = math.clamp(ResizeStartSize.Y + delta.Y, 240, viewportSize.Y - 50)
+
+				MainFrame.Size = UDim2.new(0, math.floor(newWidth), 0, math.floor(newHeight))
+
+				-- Persist the resized size for the next open animation.
+				Config.Scale = MainFrame.Size
+			end
+		end)
+	end
 
 	local TabFrameBaseTrans = 0.25;
 
@@ -9958,11 +10078,20 @@ function Compkiller.new(Config : Window)
 						});
 					end;
 				else
-					if not WindowArgs.IsOpen then
-						ToggleCloseUI(true);
+					-- Always show the toggle button so desktop users can open/close via touch/click.
+					ToggleCloseUI(true);
+
+					if WindowArgs.IsOpen then
+						ImageLabel:GetAttribute("Hover",false);
+						Compkiller:_Animation(ImageLabel,TweenInfo.new(0.2),{
+							ImageTransparency = 0.35
+						});
 					else
-						ToggleCloseUI(false);
-					end
+						ImageLabel:GetAttribute("Hover",true);
+						Compkiller:_Animation(ImageLabel,TweenInfo.new(0.2),{
+							ImageTransparency = 0.1
+						});
+					end;
 				end;
 			end
 		end));

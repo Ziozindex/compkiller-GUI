@@ -137,6 +137,9 @@ local Window = Compkiller.new({
     TextSize = 15,
 })
 ```
+## Mobile Support
+- On mobile (touch devices), the menu toggle button (logo) is always visible at the right edge; tap it to open/close the UI.
+- On mobile, you can resize the window by dragging the small handle on the bottom-right.
 
 ## 5. Watermark
 
@@ -263,7 +266,7 @@ Compkiller:RefreshCurrentColor()
 print(Compkiller:GetTheme()) -- returns table (copy to clipboard with button)
 
 -- Get version
-print(Compkiller:GetVersion()) -- returns version string e.g. "2.7"
+print(Compkiller:GetVersion()) -- returns version string e.g. "2.8"
 ```
 
 ## 9. Config Tab (Recommended)
@@ -285,6 +288,7 @@ ConfigUI:Init()
 
 ## Changelog
 - 2026-03-19: Improved `TextBox` focus/hover visuals, added `Numeric` documentation (and fixed legacy `Numberic` support), and added a pressed-state animation to `Button`.
+- 2026-03-19: Mobile UX improvements: always-visible menu toggle button and drag-to-resize handle; added pressed-state feedback to `Toggle`, `Slider`, and `Keybind`.
 
 # Credits
 
