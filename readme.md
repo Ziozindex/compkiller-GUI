@@ -240,7 +240,8 @@ Section:AddTextBox({
     Name = "TextBox",
     Placeholder = "Type here...",
     Default = "Hello",
-    Callback = function(text) end
+    Numeric = false, -- when true, Callback receives a number (digits + decimal only)
+    Callback = function(value) end
 })
 ```
 
@@ -262,7 +263,7 @@ Compkiller:RefreshCurrentColor()
 print(Compkiller:GetTheme()) -- returns table (copy to clipboard with button)
 
 -- Get version
-print(Compkiller:GetVersion()) -- returns version string e.g. "2.6"
+print(Compkiller:GetVersion()) -- returns version string e.g. "2.7"
 ```
 
 ## 9. Config Tab (Recommended)
@@ -281,6 +282,9 @@ ConfigUI:Init()
 - Risky = True makes the element red (dangerous options)
 - Type = "Single" removes left/right section
 - All colors are live-updatable with :RefreshCurrentColor()
+
+## Changelog
+- 2026-03-19: Improved `TextBox` focus/hover visuals, added `Numeric` documentation (and fixed legacy `Numberic` support), and added a pressed-state animation to `Button`.
 
 # Credits
 

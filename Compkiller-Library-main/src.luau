@@ -6,7 +6,7 @@
     Github: https://github.com/4lpaca-pin/CompKiller
     Original: compkiller.net
 
-        Version: 2.6
+        Version: 2.7
     - Improved Performance Mode
     	Compkiller:OptimizeMode(< boolean >)
   	- Added Auto Color Logo
@@ -356,7 +356,7 @@ local Mouse: Mouse = LocalPlayer:GetMouse();
 local CurrentCamera: Camera? = cloneref(workspace.CurrentCamera);
 
 local Compkiller = {
-	Version = '2.6',
+	Version = '2.7',
 	Logo = "rbxassetid://120245531583106",
 	Windows = {},
 	Scale = {
@@ -5016,22 +5016,45 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 			Property = 'TextColor3'
 		});
 
+		local isHover = false;
+		local isPressed = false;
+
 		Compkiller:_Hover(Frame,function()
-			if Signal:GetValue() then
+			isHover = true;
+			if Signal:GetValue() and not isPressed then
 				Compkiller:_Animation(Frame,TweenInfo.new(0.2),{
 					BackgroundTransparency = 0
 				})
 			end;
 		end,function()
-			if Signal:GetValue() then
+			isHover = false;
+			if Signal:GetValue() and not isPressed then
 				Compkiller:_Animation(Frame,TweenInfo.new(0.2),{
 					BackgroundTransparency = 0.1
 				})
 			end;
 		end);
 
-		Compkiller:_Input(Frame,function()
+		local ClickOverlay = Compkiller:_Input(Frame,function()
 			Config.Callback();
+		end);
+
+		ClickOverlay.MouseButton1Down:Connect(function()
+			if Signal:GetValue() then
+				isPressed = true;
+				Compkiller:_Animation(Frame,TweenInfo.new(0.08),{
+					BackgroundTransparency = 0
+				})
+			end;
+		end);
+
+		ClickOverlay.MouseButton1Up:Connect(function()
+			if Signal:GetValue() then
+				isPressed = false;
+				Compkiller:_Animation(Frame,TweenInfo.new(0.08),{
+					BackgroundTransparency = (isHover and 0) or 0.1
+				})
+			end;
 		end);
 
 		local Args = {};
@@ -5579,13 +5602,21 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 	end;
 
 	function Args:AddTextBox(Config: TextBoxConfig)
+		local numericProvided = Config.Numeric ~= nil;
+		local legacyNumericProvided = (Config :: any).Numberic ~= nil;
+
 		Config = Compkiller.__CONFIG(Config , {
 			Name = "TextBox",
 			Default = "",
 			Placeholder = "Placeholder",
-			Numberic = false,
+			Numeric = false,
 			Callback = function() end,
 		});
+
+		-- Back-compat: old key was misspelled as "Numberic"
+		if legacyNumericProvided and not numericProvided then
+			Config.Numeric = (Config :: any).Numberic;
+		end;
 
 		local TextBox = Instance.new("Frame")
 		local BlockText = Instance.new("TextLabel")
@@ -5748,6 +5779,59 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal ,
 
 				Config.Default = TextBox_2.Text;
 			end;
+		end);
+
+		local function SyncNonFocused()
+			if Signal:GetValue() then
+				Compkiller:_Animation(UIStroke,TweenInfo.new(0.15),{
+					Color = Compkiller.Colors.HighStrokeColor,
+					Transparency = 0
+				})
+				Compkiller:_Animation(LinkValues,TweenInfo.new(0.15),{
+					BackgroundColor3 = Compkiller.Colors.DropColor,
+					BackgroundTransparency = 0
+				})
+			else
+				Compkiller:_Animation(UIStroke,TweenInfo.new(0.15),{
+					Transparency = 1
+				})
+				Compkiller:_Animation(LinkValues,TweenInfo.new(0.15),{
+					BackgroundTransparency = 1
+				})
+			end
+		end;
+
+		-- Hover + focus visuals for clarity when editing
+		Compkiller:_Hover(LinkValues,function()
+			if Signal:GetValue() and not TextBox_2:IsFocused() then
+				Compkiller:_Animation(LinkValues,TweenInfo.new(0.15),{
+					BackgroundColor3 = Compkiller.Colors.MouseEnter
+				})
+				Compkiller:_Animation(UIStroke,TweenInfo.new(0.15),{
+					Color = Compkiller.Colors.HighStrokeColor
+				})
+			end;
+		end,function()
+			if not TextBox_2:IsFocused() then
+				SyncNonFocused()
+			end;
+		end);
+
+		TextBox_2.Focused:Connect(function()
+			if Signal:GetValue() then
+				Compkiller:_Animation(LinkValues,TweenInfo.new(0.15),{
+					BackgroundColor3 = Compkiller.Colors.Highlight,
+					BackgroundTransparency = 0
+				})
+				Compkiller:_Animation(UIStroke,TweenInfo.new(0.15),{
+					Color = Compkiller.Colors.Highlight,
+					Transparency = 0
+				})
+			end;
+		end);
+
+		TextBox_2.FocusLost:Connect(function()
+			SyncNonFocused()
 		end);
 
 		local Args = {};
