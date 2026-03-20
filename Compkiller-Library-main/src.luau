@@ -6624,7 +6624,6 @@ function Compkiller.new(Config : Window)
 		local resizeConn: RBXScriptConnection? = nil
 		local resizeEndConn: RBXScriptConnection? = nil
 		local lastStep = tick()
-		local activeTouchId: number? = nil
 		local activeInputType: Enum.UserInputType? = nil
 
 		local function getResizeBounds()
@@ -6675,7 +6674,6 @@ function Compkiller.new(Config : Window)
 			IsResizing = false
 			ResizeStartPos = nil
 			ResizeStartSize = nil
-			activeTouchId = nil
 			activeInputType = nil
 
 			if resizeConn then
@@ -6704,7 +6702,8 @@ function Compkiller.new(Config : Window)
 
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				activeInputType = input.UserInputType
-				activeTouchId = (input.UserInputType == Enum.UserInputType.Touch) and input.TouchId or nil
+				-- Note: some Roblox environments do not expose a per-touch identifier.
+				-- We keep the resize session active and stop only on InputEnded for the same input type.
 
 				-- Prevent the initial "open" tween from fighting the resize while dragging.
 				if openTween then
@@ -6730,10 +6729,6 @@ function Compkiller.new(Config : Window)
 					resizeEndConn = UserInputService.InputEnded:Connect(function(endInput)
 						if not IsResizing then return end
 						if endInput.UserInputType ~= activeInputType then return end
-						if activeTouchId ~= nil then
-							if endInput.UserInputType ~= Enum.UserInputType.Touch then return end
-							if endInput.TouchId ~= activeTouchId then return end
-						end
 						finishResize()
 					end)
 				end
@@ -6753,11 +6748,6 @@ function Compkiller.new(Config : Window)
 
 				targetSize = Vector2.new(newWidth, newHeight)
 			elseif input.UserInputType == Enum.UserInputType.Touch then
-				-- Only track the active touch that started the resize.
-				if activeTouchId == nil or input.TouchId ~= activeTouchId then
-					return
-				end
-
 				local delta = input.Position - ResizeStartPos
 				local minW, maxW, minH, maxH = getResizeBounds()
 
