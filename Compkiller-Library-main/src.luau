@@ -361,7 +361,8 @@ local Compkiller = {
 	Windows = {},
 	Scale = {
 		Window = UDim2.new(0, 485,0, 565),
-		Mobile = UDim2.new(0, 450,0, 375),
+		-- Kept as a fallback; actual mobile default is computed at runtime to fit viewport.
+		Mobile = UDim2.new(0, 360,0, 300),
 		TabOpen = 185,
 		TabClose = 85,
 	},
@@ -1855,6 +1856,24 @@ end;
 
 function Compkiller:_IsMobile()
 	return UserInputService.TouchEnabled;
+end;
+
+function Compkiller:_GetMobileDefaultScale()
+	-- Compute a "not too big" default based on the current viewport size.
+	-- This keeps the UI usable on smaller phones while still allowing resizing.
+	local viewportSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(640, 960)
+
+	local pad = 50
+	local minW = 240
+	local minH = 180
+	local maxW = math.max(minW, viewportSize.X - pad)
+	local maxH = math.max(minH, viewportSize.Y - pad)
+
+	-- Bias towards width fit; keep height reasonable so tabs/content remain reachable.
+	local targetW = math.floor(viewportSize.X * 0.65)
+	local targetH = math.floor(viewportSize.Y * 0.40)
+
+	return UDim2.new(0, math.clamp(targetW, minW, maxW), 0, math.clamp(targetH, minH, maxH))
 end;
 
 function Compkiller:_AddLinkValue(Name , Default , GlobalBlock , LinkValues , rep , Signal)
@@ -6466,7 +6485,7 @@ function Compkiller.new(Config : Window)
 
 	if not Config.Scale then
 		if Compkiller:_IsMobile() then
-			Config.Scale = Compkiller.Scale.Mobile;
+			Config.Scale = Compkiller:_GetMobileDefaultScale();
 		else
 			Config.Scale = Compkiller.Scale.Window;
 		end;
@@ -6598,6 +6617,66 @@ function Compkiller.new(Config : Window)
 		local ResizeStartPos: Vector2? = nil
 		local ResizeStartSize: Vector2? = nil
 
+		local targetSize: Vector2? = nil
+		local currentSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
+
+		local resizeConn: RBXScriptConnection? = nil
+		local lastStep = tick()
+
+		local function getResizeBounds()
+			local viewportSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1920, 1080)
+			local pad = 50
+			local minW = 240
+			local minH = 180
+			local maxW = math.max(minW, viewportSize.X - pad)
+			local maxH = math.max(minH, viewportSize.Y - pad)
+			return minW, maxW, minH, maxH
+		end
+
+		local function ensureResizeLoop()
+			if resizeConn then return end
+			lastStep = tick()
+			resizeConn = RunService.RenderStepped:Connect(function()
+				if not IsResizing or not targetSize then
+					return
+				end
+
+				local now = tick()
+				local dt = math.max(0, now - lastStep)
+				lastStep = now
+
+				-- Smooth drag: exponential decay towards the target size.
+				local smoothingSpeed = 18
+				local alpha = 1 - math.exp(-smoothingSpeed * dt)
+
+				currentSize = Vector2.new(
+					currentSize.X + (targetSize.X - currentSize.X) * alpha,
+					currentSize.Y + (targetSize.Y - currentSize.Y) * alpha
+				)
+
+				MainFrame.Size = UDim2.new(0, currentSize.X, 0, currentSize.Y)
+			end)
+		end
+
+		local function finishResize()
+			IsResizing = false
+			ResizeStartPos = nil
+			ResizeStartSize = nil
+
+			if resizeConn then
+				resizeConn:Disconnect()
+				resizeConn = nil
+			end
+
+			if targetSize then
+				MainFrame.Size = UDim2.new(0, targetSize.X, 0, targetSize.Y)
+				-- Persist the resized size for the next open animation.
+				Config.Scale = MainFrame.Size
+			end
+
+			targetSize = nil
+		end
+
 		ResizeHandle.InputBegan:Connect(function(input)
 			if IsResizing then return end
 			if not WindowArgs.IsOpen then return end
@@ -6606,15 +6685,20 @@ function Compkiller.new(Config : Window)
 				IsResizing = true
 				ResizeStartPos = input.Position
 				ResizeStartSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
+				local minW, maxW, minH, maxH = getResizeBounds()
+				currentSize = Vector2.new(
+					math.clamp(ResizeStartSize.X, minW, maxW),
+					math.clamp(ResizeStartSize.Y, minH, maxH)
+				)
+				targetSize = currentSize
+				ensureResizeLoop()
 			end
 		end)
 
 		ResizeHandle.InputEnded:Connect(function(input)
 			if not IsResizing then return end
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				IsResizing = false
-				ResizeStartPos = nil
-				ResizeStartSize = nil
+				finishResize()
 			end
 		end)
 
@@ -6624,15 +6708,12 @@ function Compkiller.new(Config : Window)
 
 			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 				local delta = input.Position - ResizeStartPos
+				local minW, maxW, minH, maxH = getResizeBounds()
 
-				local viewportSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1920, 1080)
-				local newWidth = math.clamp(ResizeStartSize.X + delta.X, 320, viewportSize.X - 50)
-				local newHeight = math.clamp(ResizeStartSize.Y + delta.Y, 240, viewportSize.Y - 50)
+				local newWidth = math.clamp(ResizeStartSize.X + delta.X, minW, maxW)
+				local newHeight = math.clamp(ResizeStartSize.Y + delta.Y, minH, maxH)
 
-				MainFrame.Size = UDim2.new(0, math.floor(newWidth), 0, math.floor(newHeight))
-
-				-- Persist the resized size for the next open animation.
-				Config.Scale = MainFrame.Size
+				targetSize = Vector2.new(newWidth, newHeight)
 			end
 		end)
 	end
