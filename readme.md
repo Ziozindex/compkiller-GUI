@@ -289,6 +289,7 @@ ConfigUI:Init()
 ## Changelog
 - 2026-03-19: Improved `TextBox` focus/hover visuals, added `Numeric` documentation (and fixed legacy `Numberic` support), and added a pressed-state animation to `Button`.
 - 2026-03-19: Mobile UX improvements: always-visible menu toggle button and drag-to-resize handle; added smooth drag resize for the window corner and reduced the default mobile window size so it doesn't start oversized; added pressed-state feedback to `Toggle`, `Slider`, and `Keybind`.
+- 2026-03-20: Mobile drag-to-resize tuning: cancel open tween on resize and increase resize responsiveness to make the drag feel smoother and easier.
 
 # Credits
 
