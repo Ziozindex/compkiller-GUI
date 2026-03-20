@@ -6620,6 +6620,7 @@ function Compkiller.new(Config : Window)
 
 		local targetSize: Vector2? = nil
 		local currentSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
+		local cornerAbsStart: Vector2? = nil
 
 		local resizeConn: RBXScriptConnection? = nil
 		local resizeEndConn: RBXScriptConnection? = nil
@@ -6667,6 +6668,14 @@ function Compkiller.new(Config : Window)
 				local roundedW = Compkiller:_Rounding(currentSize.X, 0)
 				local roundedH = Compkiller:_Rounding(currentSize.Y, 0)
 				MainFrame.Size = UDim2.new(0, roundedW, 0, roundedH)
+
+				-- Keep the resize corner fixed so the window doesn't "move"
+				-- while the user is dragging the bottom-right handle.
+				if cornerAbsStart then
+					local centerX = cornerAbsStart.X - (roundedW * 0.5)
+					local centerY = cornerAbsStart.Y - (roundedH * 0.5)
+					MainFrame.Position = UDim2.new(0, Compkiller:_Rounding(centerX, 0), 0, Compkiller:_Rounding(centerY, 0))
+				end
 			end)
 		end
 
@@ -6675,6 +6684,7 @@ function Compkiller.new(Config : Window)
 			ResizeStartPos = nil
 			ResizeStartSize = nil
 			activeInputType = nil
+			local cornerToKeep = cornerAbsStart
 
 			if resizeConn then
 				resizeConn:Disconnect()
@@ -6688,11 +6698,22 @@ function Compkiller.new(Config : Window)
 			end
 
 			if targetSize then
-				MainFrame.Size = UDim2.new(0, Compkiller:_Rounding(targetSize.X, 0), 0, Compkiller:_Rounding(targetSize.Y, 0))
+				local roundedW = Compkiller:_Rounding(targetSize.X, 0)
+				local roundedH = Compkiller:_Rounding(targetSize.Y, 0)
+				MainFrame.Size = UDim2.new(0, roundedW, 0, roundedH)
+
+				-- Keep the resize corner fixed on release as well.
+				if cornerToKeep then
+					local centerX = cornerToKeep.X - (roundedW * 0.5)
+					local centerY = cornerToKeep.Y - (roundedH * 0.5)
+					MainFrame.Position = UDim2.new(0, Compkiller:_Rounding(centerX, 0), 0, Compkiller:_Rounding(centerY, 0))
+				end
+
 				-- Persist the resized size for the next open animation.
 				Config.Scale = MainFrame.Size
 			end
 
+			cornerAbsStart = nil
 			targetSize = nil
 		end
 
@@ -6716,6 +6737,7 @@ function Compkiller.new(Config : Window)
 				IsResizing = true
 				ResizeStartPos = input.Position
 				ResizeStartSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
+				cornerAbsStart = MainFrame.AbsolutePosition + MainFrame.AbsoluteSize
 				local minW, maxW, minH, maxH = getResizeBounds()
 				currentSize = Vector2.new(
 					math.clamp(ResizeStartSize.X, minW, maxW),
