@@ -6621,6 +6621,8 @@ function Compkiller.new(Config : Window)
 		local targetSize: Vector2? = nil
 		local currentSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
 		local cornerAbsStart: Vector2? = nil
+		local oldAnchorPoint: Vector2? = nil
+		local parentAbsPos: Vector2? = nil
 
 		local resizeConn: RBXScriptConnection? = nil
 		local resizeEndConn: RBXScriptConnection? = nil
@@ -6672,9 +6674,14 @@ function Compkiller.new(Config : Window)
 				-- Keep the resize corner fixed so the window doesn't "move"
 				-- while the user is dragging the bottom-right handle.
 				if cornerAbsStart then
-					local centerX = cornerAbsStart.X - (roundedW * 0.5)
-					local centerY = cornerAbsStart.Y - (roundedH * 0.5)
-					MainFrame.Position = UDim2.new(0, Compkiller:_Rounding(centerX, 0), 0, Compkiller:_Rounding(centerY, 0))
+					-- While resizing, we temporarily anchor the window at (0,0) (top-left),
+					-- so Position offsets are the top-left in pixels.
+					local left = cornerAbsStart.X - roundedW
+					local top = cornerAbsStart.Y - roundedH
+					MainFrame.Position = UDim2.new(
+						0, Compkiller:_Rounding(left, 0),
+						0, Compkiller:_Rounding(top, 0)
+					)
 				end
 			end)
 		end
@@ -6685,6 +6692,10 @@ function Compkiller.new(Config : Window)
 			ResizeStartSize = nil
 			activeInputType = nil
 			local cornerToKeep = cornerAbsStart
+			local anchorToRestore = oldAnchorPoint
+			local parentToUse = parentAbsPos
+			local finalRoundedW = Compkiller:_Rounding(MainFrame.AbsoluteSize.X, 0)
+			local finalRoundedH = Compkiller:_Rounding(MainFrame.AbsoluteSize.Y, 0)
 
 			if resizeConn then
 				resizeConn:Disconnect()
@@ -6698,22 +6709,38 @@ function Compkiller.new(Config : Window)
 			end
 
 			if targetSize then
-				local roundedW = Compkiller:_Rounding(targetSize.X, 0)
-				local roundedH = Compkiller:_Rounding(targetSize.Y, 0)
-				MainFrame.Size = UDim2.new(0, roundedW, 0, roundedH)
+				finalRoundedW = Compkiller:_Rounding(targetSize.X, 0)
+				finalRoundedH = Compkiller:_Rounding(targetSize.Y, 0)
+				MainFrame.Size = UDim2.new(0, finalRoundedW, 0, finalRoundedH)
 
-				-- Keep the resize corner fixed on release as well.
+				-- Keep the resize corner fixed on release while we're anchored at (0,0).
 				if cornerToKeep then
-					local centerX = cornerToKeep.X - (roundedW * 0.5)
-					local centerY = cornerToKeep.Y - (roundedH * 0.5)
-					MainFrame.Position = UDim2.new(0, Compkiller:_Rounding(centerX, 0), 0, Compkiller:_Rounding(centerY, 0))
+					local left = cornerToKeep.X - finalRoundedW
+					local top = cornerToKeep.Y - finalRoundedH
+					MainFrame.Position = UDim2.new(
+						0, Compkiller:_Rounding(left, 0),
+						0, Compkiller:_Rounding(top, 0)
+					)
 				end
 
 				-- Persist the resized size for the next open animation.
 				Config.Scale = MainFrame.Size
 			end
 
+			-- Restore original anchorpoint and position so the UI returns to its normal layout.
+			if anchorToRestore and parentToUse then
+				local topLeftAbs = MainFrame.AbsolutePosition
+				local anchorAbs = topLeftAbs + Vector2.new(finalRoundedW * anchorToRestore.X, finalRoundedH * anchorToRestore.Y)
+				MainFrame.AnchorPoint = anchorToRestore
+				MainFrame.Position = UDim2.new(
+					0, Compkiller:_Rounding(anchorAbs.X - parentToUse.X, 0),
+					0, Compkiller:_Rounding(anchorAbs.Y - parentToUse.Y, 0)
+				)
+			end
+
 			cornerAbsStart = nil
+			oldAnchorPoint = nil
+			parentAbsPos = nil
 			targetSize = nil
 		end
 
@@ -6737,7 +6764,17 @@ function Compkiller.new(Config : Window)
 				IsResizing = true
 				ResizeStartPos = input.Position
 				ResizeStartSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
+				oldAnchorPoint = MainFrame.AnchorPoint
+				parentAbsPos = (MainFrame.Parent and MainFrame.Parent.AbsolutePosition) or Vector2.new(0, 0)
+
 				cornerAbsStart = MainFrame.AbsolutePosition + MainFrame.AbsoluteSize
+				local topLeftAbs = MainFrame.AbsolutePosition
+				-- Temporarily anchor at top-left so Position does not shift when resizing.
+				MainFrame.AnchorPoint = Vector2.new(0, 0)
+				MainFrame.Position = UDim2.new(
+					0, Compkiller:_Rounding(topLeftAbs.X, 0),
+					0, Compkiller:_Rounding(topLeftAbs.Y, 0)
+				)
 				local minW, maxW, minH, maxH = getResizeBounds()
 				currentSize = Vector2.new(
 					math.clamp(ResizeStartSize.X, minW, maxW),
