@@ -6622,7 +6622,10 @@ function Compkiller.new(Config : Window)
 		local currentSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
 
 		local resizeConn: RBXScriptConnection? = nil
+		local resizeEndConn: RBXScriptConnection? = nil
 		local lastStep = tick()
+		local activeTouchId: number? = nil
+		local activeInputType: Enum.UserInputType? = nil
 
 		local function getResizeBounds()
 			local viewportSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1920, 1080)
@@ -6672,10 +6675,18 @@ function Compkiller.new(Config : Window)
 			IsResizing = false
 			ResizeStartPos = nil
 			ResizeStartSize = nil
+			activeTouchId = nil
+			activeInputType = nil
 
 			if resizeConn then
 				resizeConn:Disconnect()
 				resizeConn = nil
+			end
+
+			-- Keep only the resize-end listener tied to this drag session.
+			if resizeEndConn then
+				resizeEndConn:Disconnect()
+				resizeEndConn = nil
 			end
 
 			if targetSize then
@@ -6692,6 +6703,9 @@ function Compkiller.new(Config : Window)
 			if not WindowArgs.IsOpen then return end
 
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				activeInputType = input.UserInputType
+				activeTouchId = (input.UserInputType == Enum.UserInputType.Touch) and input.TouchId or nil
+
 				-- Prevent the initial "open" tween from fighting the resize while dragging.
 				if openTween then
 					pcall(function()
@@ -6710,13 +6724,19 @@ function Compkiller.new(Config : Window)
 				)
 				targetSize = currentSize
 				ensureResizeLoop()
-			end
-		end)
 
-		ResizeHandle.InputEnded:Connect(function(input)
-			if not IsResizing then return end
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				finishResize()
+				-- Stop resizing only when this specific input ends.
+				if not resizeEndConn then
+					resizeEndConn = UserInputService.InputEnded:Connect(function(endInput)
+						if not IsResizing then return end
+						if endInput.UserInputType ~= activeInputType then return end
+						if activeTouchId ~= nil then
+							if endInput.UserInputType ~= Enum.UserInputType.Touch then return end
+							if endInput.TouchId ~= activeTouchId then return end
+						end
+						finishResize()
+					end)
+				end
 			end
 		end)
 
@@ -6724,7 +6744,20 @@ function Compkiller.new(Config : Window)
 			if not IsResizing then return end
 			if not (ResizeStartPos and ResizeStartSize) then return end
 
-			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				local delta = input.Position - ResizeStartPos
+				local minW, maxW, minH, maxH = getResizeBounds()
+
+				local newWidth = math.clamp(ResizeStartSize.X + delta.X, minW, maxW)
+				local newHeight = math.clamp(ResizeStartSize.Y + delta.Y, minH, maxH)
+
+				targetSize = Vector2.new(newWidth, newHeight)
+			elseif input.UserInputType == Enum.UserInputType.Touch then
+				-- Only track the active touch that started the resize.
+				if activeTouchId == nil or input.TouchId ~= activeTouchId then
+					return
+				end
+
 				local delta = input.Position - ResizeStartPos
 				local minW, maxW, minH, maxH = getResizeBounds()
 
