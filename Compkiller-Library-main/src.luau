@@ -6625,6 +6625,36 @@ function Compkiller.new(Config : Window)
 		local resizeEndConn: RBXScriptConnection? = nil
 		local lastStep = tick()
 		local activeInputType: Enum.UserInputType? = nil
+		local lastInputChangedLog = 0
+		local lastRenderLog = 0
+
+		local LOG_ENDPOINT = 'http://127.0.0.1:7621/ingest/ade4e117-d68b-4128-afbf-4ecb4f78d1fb'
+		local LOG_SESSION_ID = '9f9041'
+		local LOG_RUN_ID = 'touch-leave-debug'
+
+		local function dbg(hypothesisId, message, data)
+			pcall(function()
+				local payload = {
+					sessionId = LOG_SESSION_ID,
+					runId = LOG_RUN_ID,
+					hypothesisId = hypothesisId,
+					location = 'Compkiller.new.mobileResize',
+					message = message,
+					data = data or {},
+					timestamp = os.time() * 1000,
+				}
+
+				HttpService:RequestAsync({
+					Url = LOG_ENDPOINT,
+					Method = 'POST',
+					Headers = {
+						['Content-Type'] = 'application/json',
+						['X-Debug-Session-Id'] = LOG_SESSION_ID,
+					},
+					Body = HttpService:JSONEncode(payload),
+				})
+			end)
+		end
 
 		local function getResizeBounds()
 			local viewportSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1920, 1080)
@@ -6667,6 +6697,22 @@ function Compkiller.new(Config : Window)
 				local roundedW = Compkiller:_Rounding(currentSize.X, 0)
 				local roundedH = Compkiller:_Rounding(currentSize.Y, 0)
 				MainFrame.Size = UDim2.new(0, roundedW, 0, roundedH)
+
+				if tick() - lastRenderLog > 0.25 then
+					lastRenderLog = tick()
+					-- #region agent log
+					dbg(
+						'H3_renderApplied',
+						'resize loop applied size',
+						{
+							appliedW = roundedW,
+							appliedH = roundedH,
+							targetW = targetSize.X,
+							targetH = targetSize.Y,
+						}
+					)
+					-- #endregion
+				end
 			end)
 		end
 
@@ -6691,6 +6737,29 @@ function Compkiller.new(Config : Window)
 				MainFrame.Size = UDim2.new(0, Compkiller:_Rounding(targetSize.X, 0), 0, Compkiller:_Rounding(targetSize.Y, 0))
 				-- Persist the resized size for the next open animation.
 				Config.Scale = MainFrame.Size
+				-- #region agent log
+				dbg(
+					'H1_finishResize',
+					'finishResize applied target size',
+					{
+						targetW = targetSize.X,
+						targetH = targetSize.Y,
+						mainAbsW = MainFrame.AbsoluteSize.X,
+						mainAbsH = MainFrame.AbsoluteSize.Y,
+					}
+				)
+				-- #endregion
+			else
+				-- #region agent log
+				dbg(
+					'H1_finishResize_noTarget',
+					'finishResize called but targetSize was nil',
+					{
+						mainAbsW = MainFrame.AbsoluteSize.X,
+						mainAbsH = MainFrame.AbsoluteSize.Y,
+					}
+				)
+				-- #endregion
 			end
 
 			targetSize = nil
@@ -6723,12 +6792,33 @@ function Compkiller.new(Config : Window)
 				)
 				targetSize = currentSize
 				ensureResizeLoop()
+				-- #region agent log
+				dbg(
+					'H2_resizeStart',
+					'resize session started',
+					{
+						inputType = tostring(input.UserInputType),
+						startW = currentSize.X,
+						startH = currentSize.Y,
+					}
+				)
+				-- #endregion
 
 				-- Stop resizing only when this specific input ends.
 				if not resizeEndConn then
 					resizeEndConn = UserInputService.InputEnded:Connect(function(endInput)
 						if not IsResizing then return end
 						if endInput.UserInputType ~= activeInputType then return end
+						-- #region agent log
+						dbg(
+							'H1_inputEnded',
+							'resize input ended; finishing resize',
+							{
+								endInputType = tostring(endInput.UserInputType),
+								activeInputType = activeInputType and tostring(activeInputType) or 'nil',
+							}
+						)
+						-- #endregion
 						finishResize()
 					end)
 				end
@@ -6747,6 +6837,22 @@ function Compkiller.new(Config : Window)
 				local newHeight = math.clamp(ResizeStartSize.Y + delta.Y, minH, maxH)
 
 				targetSize = Vector2.new(newWidth, newHeight)
+
+				if tick() - lastInputChangedLog > 0.15 then
+					lastInputChangedLog = tick()
+					-- #region agent log
+					dbg(
+						'H2_inputChanged',
+						'mouse movement updated target size',
+						{
+							newWidth = newWidth,
+							newHeight = newHeight,
+							currentW = currentSize.X,
+							currentH = currentSize.Y,
+						}
+					)
+					-- #endregion
+				end
 			elseif input.UserInputType == Enum.UserInputType.Touch then
 				local delta = input.Position - ResizeStartPos
 				local minW, maxW, minH, maxH = getResizeBounds()
@@ -6755,6 +6861,22 @@ function Compkiller.new(Config : Window)
 				local newHeight = math.clamp(ResizeStartSize.Y + delta.Y, minH, maxH)
 
 				targetSize = Vector2.new(newWidth, newHeight)
+
+				if tick() - lastInputChangedLog > 0.15 then
+					lastInputChangedLog = tick()
+					-- #region agent log
+					dbg(
+						'H2_inputChanged',
+						'touch updated target size',
+						{
+							newWidth = newWidth,
+							newHeight = newHeight,
+							currentW = currentSize.X,
+							currentH = currentSize.Y,
+						}
+					)
+					-- #endregion
+				end
 			end
 		end)
 	end
