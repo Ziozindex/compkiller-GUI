@@ -6581,7 +6581,7 @@ function Compkiller.new(Config : Window)
 		end;
 	end)
 
-	Compkiller:_Animation(MainFrame,TweenInfo.new(1,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut),{
+	local openTween = Compkiller:_Animation(MainFrame,TweenInfo.new(1,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut),{
 		Size = Config.Scale
 	});
 
@@ -6599,8 +6599,9 @@ function Compkiller.new(Config : Window)
 		ResizeHandle.BackgroundTransparency = 1
 		ResizeHandle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		ResizeHandle.BorderSizePixel = 0
-		ResizeHandle.Size = UDim2.new(0, 20, 0, 20)
-		ResizeHandle.Position = UDim2.new(1, -5, 1, -5)
+		-- Bigger hitbox so dragging the corner is easy on mobile.
+		ResizeHandle.Size = UDim2.new(0, 34, 0, 34)
+		ResizeHandle.Position = UDim2.new(1, -12, 1, -12)
 		ResizeHandle.ZIndex = 50
 		ResizeHandle.Active = true
 
@@ -6646,15 +6647,24 @@ function Compkiller.new(Config : Window)
 				lastStep = now
 
 				-- Smooth drag: exponential decay towards the target size.
-				local smoothingSpeed = 18
-				local alpha = 1 - math.exp(-smoothingSpeed * dt)
+				-- Make it feel "attached" to the pointer: high smoothing responsiveness.
+				local smoothingSpeed = 200
+				local cappedDt = math.clamp(dt, 0, 1/30)
+				local alpha = 1 - math.exp(-smoothingSpeed * cappedDt)
 
 				currentSize = Vector2.new(
 					currentSize.X + (targetSize.X - currentSize.X) * alpha,
 					currentSize.Y + (targetSize.Y - currentSize.Y) * alpha
 				)
 
-				MainFrame.Size = UDim2.new(0, currentSize.X, 0, currentSize.Y)
+				-- Stable rounding avoids visible jitter from fractional offsets.
+				if math.abs(targetSize.X - currentSize.X) < 0.35 and math.abs(targetSize.Y - currentSize.Y) < 0.35 then
+					currentSize = targetSize
+				end
+
+				local roundedW = Compkiller:_Rounding(currentSize.X, 0)
+				local roundedH = Compkiller:_Rounding(currentSize.Y, 0)
+				MainFrame.Size = UDim2.new(0, roundedW, 0, roundedH)
 			end)
 		end
 
@@ -6669,7 +6679,7 @@ function Compkiller.new(Config : Window)
 			end
 
 			if targetSize then
-				MainFrame.Size = UDim2.new(0, targetSize.X, 0, targetSize.Y)
+				MainFrame.Size = UDim2.new(0, Compkiller:_Rounding(targetSize.X, 0), 0, Compkiller:_Rounding(targetSize.Y, 0))
 				-- Persist the resized size for the next open animation.
 				Config.Scale = MainFrame.Size
 			end
@@ -6682,6 +6692,14 @@ function Compkiller.new(Config : Window)
 			if not WindowArgs.IsOpen then return end
 
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				-- Prevent the initial "open" tween from fighting the resize while dragging.
+				if openTween then
+					pcall(function()
+						openTween:Cancel()
+					end)
+					openTween = nil
+				end
+
 				IsResizing = true
 				ResizeStartPos = input.Position
 				ResizeStartSize = Vector2.new(MainFrame.AbsoluteSize.X, MainFrame.AbsoluteSize.Y)
