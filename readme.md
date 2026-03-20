@@ -291,8 +291,6 @@ ConfigUI:Init()
 - 2026-03-19: Mobile UX improvements: always-visible menu toggle button and drag-to-resize handle; added smooth drag resize for the window corner and reduced the default mobile window size so it doesn't start oversized; added pressed-state feedback to `Toggle`, `Slider`, and `Keybind`.
 - 2026-03-20: Mobile drag-to-resize tuning: cancel open tween on resize and increase resize responsiveness to make the drag feel smoother and easier.
 - 2026-03-20: Mobile drag-to-resize fix: keep resizing while the finger is off the corner handle; stop only when the drag input is released.
-- 2026-03-20: Mobile drag-to-resize behavior: anchor the resize corner so the window doesn't shift position while dragging.
-- 2026-03-20: Mobile drag-to-resize fix: anchor at top-left during drag so resizing doesn't break.
 
 # Credits
 
